@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Pac-Man Rétro Jaune & Rouge</title>
+
+<style>
+body {
+    margin: 0;
+    background-image: url("/Users/user/Documents/2DNMADE/MSCHF/mcdologo.png");
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+
+    display: flex;
+    justify-content: center;  /* centre horizontalement */
+    align-items: center;      /* centre verticalement */
+    min-height: 100vh;
+}
+
+
+canvas {
+    image-rendering: pixelated;
+    border: 4px solid red;
+}
+</style>
+</head>
+
+<body>
+
+<canvas id="game"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+
+const TILE = 48;
+
+// Couleurs
+const BG_COLOR = "#F20505";
+const WALL_COLOR = "#F2B705";
+const DOT_COLOR = "#ffd800";
+const PLAYER_COLOR = "#ffff00";
+const GHOST_COLOR = "#F20505";
+const TEXT_COLOR = "#ffd800";
+
+// Carte
+const LEVEL = [
+"11111111111111111111111111111111",
+"10000000001100000000000000000001",
+"10111111101101111101111111111101",
+"10000000000000000000000000000001",
+"10111101111111011111011111111001",
+"10000100001100010000000000001001",
+"11110111101111101111101111101111",
+"10000000000000000000000000000001",
+"10111111101111111101111111111101",
+"10000000001100000000000000000001",
+"11111111111111111111111111111111",
+];
+
+// Taille du canvas adaptée à la map
+canvas.width  = LEVEL[0].length * TILE;
+canvas.height = LEVEL.length * TILE;
+
+let walls = [];
+let dots = [];
+
+for (let y = 0; y < LEVEL.length; y++) {
+    for (let x = 0; x < LEVEL[y].length; x++) {
+        if (LEVEL[y][x] === "1") {
+            walls.push({ x: x*TILE, y: y*TILE, w: TILE, h: TILE });
+        } else {
+            dots.push({ x: x*TILE + TILE/2, y: y*TILE + TILE/2 });
+        }
+    }
+}
+
+const playerImg = new Image();
+playerImg.src = "poulet.png";
+
+
+let player = {
+    x: TILE,
+    y: TILE,
+    w: TILE * 1.2,     // taille visuelle
+    h: TILE * 1.2,
+    hit: TILE * 0.6,   // taille collision
+    speed: TILE / 7
+};
+
+function getHitbox(p) {
+    return {
+        x: p.x + (p.w - p.hit) / 2,
+        y: p.y + (p.h - p.hit) / 2,
+        w: p.hit,
+        h: p.hit
+    };
+}
+
+function move(entity, dx, dy) {
+    entity.x += dx;
+    let hit = getHitbox(entity);
+    for (let w of walls) {
+        if (collide(hit, w)) {
+            entity.x -= dx;
+            break;
+        }
+    }
+
+    entity.y += dy;
+    hit = getHitbox(entity);
+    for (let w of walls) {
+        if (collide(hit, w)) {
+            entity.y -= dy;
+            break;
+        }
+    }
+}
+
+
+let ghost = {
+    x: (LEVEL[0].length - 2) * TILE,
+    y: (LEVEL.length - 2) * TILE,
+    w: TILE - 4,
+    h: TILE - 4,
+    dx: 1,
+    dy: 0,
+    speed: 9
+};
+
+let score = 0;
+let keys = {};
+
+document.addEventListener("keydown", e => keys[e.key] = true);
+document.addEventListener("keyup", e => keys[e.key] = false);
+
+function collide(a, b) {
+    return a.x < b.x + b.w &&
+           a.x + a.w > b.x &&
+           a.y < b.y + b.h &&
+           a.y + a.h > b.y;
+}
+
+function move(entity, dx, dy) {
+    entity.x += dx;
+    for (let w of walls) {
+        if (collide(entity, w)) {
+            entity.x -= dx;
+            break;
+        }
+    }
+    entity.y += dy;
+    for (let w of walls) {
+        if (collide(entity, w)) {
+            entity.y -= dy;
+            break;
+        }
+    }
+}
+
+function update() {
+    let dx = 0, dy = 0;
+    if (keys["ArrowLeft"]) dx = -player.speed;
+    if (keys["ArrowRight"]) dx = player.speed;
+    if (keys["ArrowUp"]) dy = -player.speed;
+    if (keys["ArrowDown"]) dy = player.speed;
+
+    move(player, dx, dy);
+
+    // Mange les points
+    dots = dots.filter(dot => {
+        let r = { x: dot.x-4, y: dot.y-4, w: 8, h: 8 };
+        if (collide(player, r)) {
+            score++;
+            return false;
+        }
+        return true;
+    });
+
+    // IA fantôme simple
+    if (Math.random() < 0.02) {
+        const dirs = [
+            {dx:1,dy:0},{dx:-1,dy:0},
+            {dx:0,dy:1},{dx:0,dy:-1}
+        ];
+        let d = dirs[Math.floor(Math.random() * dirs.length)];
+        ghost.dx = d.dx;
+        ghost.dy = d.dy;
+    }
+
+    move(ghost, ghost.dx * ghost.speed, ghost.dy * ghost.speed);
+
+    if (collide(player, ghost)) {
+        alert("GAME OVER\nScore : " + score);
+        location.reload();
+    }
+}
+
+
+
+// Dessin du fantôme = poulet 🐔
+function drawChickenGhost(g) {
+    const x = g.x;
+    const y = g.y;
+    const s = g.w;
+
+    // Corps
+    ctx.fillStyle = "#FFD966";
+    ctx.beginPath();
+    ctx.arc(x + s/2, y + s/2, s * 0.5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Tête
+    ctx.beginPath();
+    ctx.arc(x + s * 0.75, y + s * 0.35, s * 0.25, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Bec
+    ctx.fillStyle = "#FF9900";
+    ctx.beginPath();
+    ctx.moveTo(x + s * 0.95, y + s * 0.35);
+    ctx.lineTo(x + s * 1.1, y + s * 0.3);
+    ctx.lineTo(x + s * 0.95, y + s * 0.4);
+    ctx.closePath();
+    ctx.fill();
+
+    // Œil
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(x + s * 0.78, y + s * 0.32, s * 0.05, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Pattes
+    ctx.strokeStyle = "#FF9900";
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x + s * 0.4, y + s);
+    ctx.lineTo(x + s * 0.35, y + s * 1.2);
+    ctx.moveTo(x + s * 0.6, y + s);
+    ctx.lineTo(x + s * 0.65, y + s * 1.2);
+    ctx.stroke();
+}
+
+function draw() {
+    ctx.fillStyle = BG_COLOR;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ctx.fillStyle = WALL_COLOR;
+    for (let w of walls) ctx.fillRect(w.x, w.y, w.w, w.h);
+
+    ctx.fillStyle = DOT_COLOR;
+    for (let d of dots) {
+        ctx.beginPath();
+        ctx.arc(d.x, d.y, 2, 0, Math.PI*2);
+        ctx.fill();
+    }
+    
+
+ctx.save();
+ctx.translate(player.x + player.w/2, player.y + player.h/2);
+
+if (keys["ArrowLeft"]) ctx.scale(-1, 1);
+
+ctx.drawImage(
+    playerImg,
+    -player.w/2,
+    -player.h/2,
+    player.w,
+    player.h
+);
+
+ctx.restore();
+
+
+
+    drawChickenGhost(ghost);
+
+
+    ctx.fillStyle = TEXT_COLOR;
+    ctx.font = "12px monospace";
+    ctx.fillText("Score: " + score, 8, canvas.height - 8);
+}
+
+function loop() {
+    update();
+    draw();
+    requestAnimationFrame(loop);
+}
+
+loop();
+</script>
+</body>
+</html>
